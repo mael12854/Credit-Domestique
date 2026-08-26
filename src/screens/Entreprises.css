@@ -1,0 +1,56 @@
+.entreprises {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.entreprises__title {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  margin-bottom: 20px;
+}
+
+.entreprises__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entreprises__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.entreprises__empty {
+  color: var(--texte-tertiaire);
+}
+
+.entreprises__balance {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+.entreprises__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.entreprises__entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.entreprises__section-title {
+  margin-bottom: 10px;
+}
