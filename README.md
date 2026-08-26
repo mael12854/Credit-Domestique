@@ -4,6 +4,8 @@ Banque fictive familiale — React + Vite, sans backend, persistée en `localSto
 
 > Établissement fictif · aucune valeur légale
 
+**En ligne :** https://credit-domestique.vercel.app
+
 ## Démarrer
 
 ```bash
