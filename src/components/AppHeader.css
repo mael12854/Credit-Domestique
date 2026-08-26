@@ -1,0 +1,75 @@
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 16px 20px;
+  background: var(--creme);
+  border-bottom: 1px solid var(--bordure-claire);
+}
+
+.app-header--admin {
+  background: var(--encre);
+  border-bottom-color: var(--encre);
+  color: var(--creme);
+}
+
+.app-header__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.app-header__back {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: inherit;
+  padding: 4px 6px;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.app-header__brand {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.app-header__right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 14px;
+}
+
+.app-header__holder {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-header__crown {
+  color: var(--laiton);
+}
+
+.app-header__link {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+  padding: 6px 4px;
+  min-height: 44px;
+}

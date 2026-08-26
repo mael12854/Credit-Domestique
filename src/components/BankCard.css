@@ -1,0 +1,84 @@
+.bank-card {
+  width: 342px;
+  max-width: 100%;
+  aspect-ratio: 342 / 216;
+  border-radius: 13px;
+  padding: 18px 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 24px rgba(26, 28, 25, 0.18);
+  color: var(--creme);
+  overflow: hidden;
+}
+
+.bank-card--foyer {
+  background-color: var(--vert-coffre);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(250, 248, 243, 0.1) 0 1px, transparent 1px 16px),
+    repeating-linear-gradient(90deg, rgba(250, 248, 243, 0.1) 0 1px, transparent 1px 16px);
+}
+
+.bank-card--prestige {
+  background-color: var(--encre);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(232, 176, 106, 0.09) 0 1px, transparent 1px 16px),
+    repeating-linear-gradient(90deg, rgba(232, 176, 106, 0.09) 0 1px, transparent 1px 16px);
+}
+
+.bank-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.bank-card__brand {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.bank-card--prestige .bank-card__brand {
+  color: var(--laiton);
+}
+
+.bank-card__eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--laiton);
+  padding-top: 3px;
+}
+
+.bank-card__chip {
+  width: 40px;
+  height: 30px;
+  border-radius: 5px;
+  background: var(--laiton);
+}
+
+.bank-card__number {
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.bank-card__bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bank-card__holder {
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+
+.bank-card__expiry {
+  font-size: 12px;
+  color: var(--laiton);
+}

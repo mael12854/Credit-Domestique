@@ -1,0 +1,75 @@
+.connexion {
+  min-height: 100vh;
+  background: var(--vert-coffre);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.connexion__panel {
+  width: 100%;
+  max-width: 360px;
+}
+
+.connexion__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.connexion__monogram {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--creme);
+  color: var(--vert-coffre);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.connexion__name {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 21px;
+  color: var(--creme);
+  letter-spacing: -0.02em;
+}
+
+.connexion__eyebrow {
+  color: var(--laiton);
+  margin-bottom: 28px;
+}
+
+.connexion__panel .field label {
+  color: rgba(250, 248, 243, 0.65);
+}
+
+.connexion__submit {
+  width: 100%;
+  margin-top: 8px;
+  background: var(--laiton);
+  color: var(--encre);
+}
+
+.connexion__submit:hover {
+  background: #dfa456;
+}
+
+.connexion__legal {
+  margin-top: 40px;
+}
+
+.connexion__legal .legal-footer {
+  color: rgba(250, 248, 243, 0.55);
+  margin-top: 0;
+  padding: 0;
+}

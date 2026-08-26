@@ -1,0 +1,115 @@
+.historique {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.historique__title {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+.historique__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.historique__filter {
+  background: var(--creme);
+  border: 1px solid var(--bordure-claire);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.historique__filter:hover {
+  border-color: var(--bordure-hover);
+}
+
+.historique__filter--active {
+  background: var(--vert-coffre);
+  color: var(--creme);
+  border-color: var(--vert-coffre);
+}
+
+.historique__table-wrap {
+  overflow-x: auto;
+}
+
+.historique__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.historique__table thead th {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--ardoise);
+  text-align: left;
+  font-weight: 400;
+  padding: 0 8px 10px 0;
+  white-space: nowrap;
+}
+
+.historique__table tbody td {
+  padding: 12px 8px 12px 0;
+  border-top: 1px solid var(--filet-interne);
+  vertical-align: top;
+}
+
+.historique__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.historique__dash {
+  color: var(--ardoise);
+}
+
+.historique__kind {
+  color: var(--texte-tertiaire);
+  font-size: 12px;
+}
+
+.historique__tag {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--cuivre);
+  border: 1px solid var(--bordure-alerte);
+  padding: 2px 6px;
+}
+
+.historique__reverse {
+  font-size: 11px;
+  color: var(--cuivre);
+  padding: 4px;
+}
+
+.historique__empty {
+  text-align: center;
+  color: var(--texte-tertiaire);
+  padding: 24px 0;
+}
+
+.historique__table tfoot td {
+  padding-top: 14px;
+  border-top: 1px solid var(--encre);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
