@@ -12,7 +12,7 @@ type Mode = 'receive' | 'withdraw' | 'charge' | 'pay'
 const NEEDS_PERSON: Mode[] = ['charge', 'pay']
 
 export function EntrepriseDetail({ companyId }: { companyId: string }) {
-  const { state, companyReceive, companyWithdraw, companyPay, requestCharge } = useBank()
+  const { state, isAdmin, companyReceive, companyWithdraw, companyPay, requestCharge } = useBank()
   const [mode, setMode] = useState<Mode | null>(null)
   const [personId, setPersonId] = useState('')
   const [amountInput, setAmountInput] = useState('')
@@ -45,6 +45,7 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
     }
   }, [pendingCharge])
 
+  if (!isAdmin) return <p className="entreprises__empty">Accès réservé à l'administrateur.</p>
   if (!company) return <p>Entreprise introuvable.</p>
 
   function openMode(next: Mode) {

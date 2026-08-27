@@ -21,13 +21,11 @@ export function AppHeader() {
         <span className="app-header__brand">Crédit Domestique</span>
       </div>
       <div className="app-header__right">
-        {(currentAccount.role === 'parent' || currentAccount.role === 'admin') &&
-          current.screen !== 'entreprises' &&
-          current.screen !== 'entreprise-detail' && (
-            <button className="app-header__link" onClick={() => navigate('entreprises')}>
-              Entreprises
-            </button>
-          )}
+        {isAdmin && current.screen !== 'entreprises' && current.screen !== 'entreprise-detail' && (
+          <button className="app-header__link" onClick={() => navigate('entreprises')}>
+            Entreprises
+          </button>
+        )}
         {currentAccount.role === 'admin' && current.screen !== 'admin' && (
           <button className="app-header__link" onClick={() => navigate('admin')}>
             Admin

@@ -37,7 +37,7 @@ export function Historique() {
   const [filter, setFilter] = useState<EntryKind | 'all'>('all')
 
   const requestedAccountId = current.params?.accountId
-  const canViewOthers = currentAccount?.role === 'parent' || isAdmin
+  const canViewOthers = isAdmin
   const accountId =
     requestedAccountId && canViewOthers ? requestedAccountId : currentAccount?.id ?? ''
   const account = state.accounts.find((a) => a.id === accountId)

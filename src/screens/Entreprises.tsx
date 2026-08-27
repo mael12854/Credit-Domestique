@@ -13,6 +13,10 @@ export function Entreprises() {
 
   const companies = state.accounts.filter((a) => a.role === 'company' && !a.archived)
 
+  if (!isAdmin) {
+    return <p className="entreprises__empty">Accès réservé à l'administrateur.</p>
+  }
+
   function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (newName.trim() === '') {
@@ -50,32 +54,28 @@ export function Entreprises() {
                 {formatMoneyFR(c.balance)}
               </span>
             </button>
-            {isAdmin && (
-              <button className="button button--ghost" onClick={() => handleArchive(c.id, c.holderName)}>
-                Supprimer
-              </button>
-            )}
+            <button className="button button--ghost" onClick={() => handleArchive(c.id, c.holderName)}>
+              Supprimer
+            </button>
           </div>
         ))}
       </div>
 
-      {isAdmin && (
-        <form className="entreprises__create-form" onSubmit={handleCreate}>
-          <div className="field">
-            <label htmlFor="newCompany">Ajouter une entreprise</label>
-            <input
-              id="newCompany"
-              placeholder="Nom de l'entreprise"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value.toUpperCase())}
-            />
-          </div>
-          {error && <p className="field-error field-error--top">{error}</p>}
-          <button type="submit" className="button button--primary">
-            Créer
-          </button>
-        </form>
-      )}
+      <form className="entreprises__create-form" onSubmit={handleCreate}>
+        <div className="field">
+          <label htmlFor="newCompany">Ajouter une entreprise</label>
+          <input
+            id="newCompany"
+            placeholder="Nom de l'entreprise"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value.toUpperCase())}
+          />
+        </div>
+        {error && <p className="field-error field-error--top">{error}</p>}
+        <button type="submit" className="button button--primary">
+          Créer
+        </button>
+      </form>
     </div>
   )
 }

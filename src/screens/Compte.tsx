@@ -167,26 +167,6 @@ export function Compte() {
       <button className="button button--ghost compte__history-link" onClick={() => navigate('historique')}>
         Voir l'historique →
       </button>
-
-      {currentAccount.role === 'parent' && (
-        <div className="panel compte__family">
-          <p className="eyebrow">Comptes du foyer</p>
-          {state.accounts
-            .filter((a) => a.id !== currentAccount.id && !a.archived && a.role !== 'bank')
-            .map((a) => (
-              <button
-                key={a.id}
-                className="compte__family-row"
-                onClick={() => navigate('historique', { accountId: a.id })}
-              >
-                <span>{a.holderName}</span>
-                <span className={`amount ${a.balance < 0 ? 'amount--debit' : 'amount--credit'}`}>
-                  {formatMoneyFR(a.balance)}
-                </span>
-              </button>
-            ))}
-        </div>
-      )}
     </div>
   )
 }
