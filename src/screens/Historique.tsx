@@ -47,6 +47,9 @@ export function Historique() {
 
   if (!account) return null
 
+  const counterpartyName = (counterpartyId: string | null) =>
+    state.accounts.find((a) => a.id === counterpartyId)?.holderName ?? '—'
+
   return (
     <div className="historique">
       <div className="historique__header">
@@ -96,6 +99,12 @@ export function Historique() {
                     <span className="historique__kind"> · {KIND_LABELS[entry.kind]}</span>
                     {entry.reversalOf && <span className="historique__tag">annulation</span>}
                     {isReversed && <span className="historique__tag">annulée</span>}
+                    {entry.counterpartyId && (
+                      <div className="historique__counterparty">
+                        {entry.debit != null ? 'Vers ' : 'De '}
+                        {counterpartyName(entry.counterpartyId)}
+                      </div>
+                    )}
                   </td>
                   <td className="historique__num amount amount--debit">
                     {entry.debit != null ? formatMoneyFR(entry.debit) : <span className="historique__dash">—</span>}

@@ -264,7 +264,15 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
           {entries.length === 0 && <p className="entreprises__empty">Aucune écriture.</p>}
           {entries.map((entry) => (
             <div key={entry.id} className="panel entreprises__entry">
-              <span>{entry.label}</span>
+              <span>
+                {entry.label}
+                {entry.counterpartyId && (
+                  <span className="entreprises__entry-counterparty">
+                    {' '}
+                    · {entry.debit != null ? 'vers' : 'de'} {personName(entry.counterpartyId)}
+                  </span>
+                )}
+              </span>
               <span className={`amount ${entry.debit != null ? 'amount--debit' : 'amount--credit'}`}>
                 {entry.debit != null ? '-' : '+'}
                 {formatMoneyFR(entry.debit ?? entry.credit ?? 0)}
