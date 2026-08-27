@@ -19,6 +19,7 @@ export type EntryKind =
   | 'loan'
   | 'interest'
   | 'adjustment'
+  | 'payment'
 
 export interface Entry {
   id: string
@@ -54,10 +55,25 @@ export interface Loan {
   respondedAt?: string // ISO — set when accepted or refused
 }
 
+export type ChargeStatus = 'pending' | 'accepted' | 'refused'
+
+/** A company's contactless-style charge request: it names the customer to debit, who must confirm. */
+export interface Charge {
+  id: string
+  companyId: string
+  payerId: string
+  amount: number // cents
+  reason: string
+  status: ChargeStatus
+  requestedAt: string // ISO
+  respondedAt?: string // ISO — set when accepted or refused
+}
+
 export interface BankState {
   accounts: Account[]
   entries: Entry[]
   loans: Loan[]
+  charges: Charge[]
   currentAccountId: string | null
   /** admin id when impersonating another account, else null */
   impersonatedBy: string | null

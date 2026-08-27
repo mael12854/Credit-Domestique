@@ -1,0 +1,42 @@
+.contactless-icon {
+  color: var(--vert-coffre);
+  overflow: visible;
+}
+
+.contactless-icon__ring {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
+  transform-origin: 12px 20px;
+  animation: contactless-ripple 1.6s ease-in-out infinite;
+}
+
+.contactless-icon__ring--1 {
+  animation-delay: 0s;
+}
+
+.contactless-icon__ring--2 {
+  animation-delay: 0.2s;
+}
+
+.contactless-icon__ring--3 {
+  animation-delay: 0.4s;
+}
+
+@keyframes contactless-ripple {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contactless-icon__ring {
+    animation: none;
+    opacity: 1;
+  }
+}

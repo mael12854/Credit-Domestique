@@ -1,11 +1,13 @@
 import { BankCard } from '../components/BankCard'
+import { ContactlessIcon } from '../components/ContactlessIcon'
 import { formatMoneyFR } from '../lib/bank'
 import { useBank } from '../store/BankProvider'
 import { useNav } from '../store/NavProvider'
 import './Compte.css'
 
 export function Compte() {
-  const { currentAccount, state, acceptLoan, refuseLoan, repayLoan } = useBank()
+  const { currentAccount, state, acceptLoan, refuseLoan, repayLoan, acceptCharge, refuseCharge } =
+    useBank()
   const { navigate } = useNav()
 
   if (!currentAccount) return null
@@ -15,6 +17,10 @@ export function Compte() {
 
   const holderName = (accountId: string) =>
     state.accounts.find((a) => a.id === accountId)?.holderName ?? '—'
+
+  const incomingCharges = state.charges.filter(
+    (c) => c.payerId === currentAccount.id && c.status === 'pending',
+  )
 
   const requestsReceived = state.loans.filter(
     (l) => l.lenderId === currentAccount.id && l.status === 'pending',
@@ -51,6 +57,24 @@ export function Compte() {
           </div>
         )}
       </div>
+
+      {incomingCharges.map((charge) => (
+        <div key={charge.id} className="panel compte__charge-prompt">
+          <ContactlessIcon size={48} />
+          <p className="compte__charge-title">
+            {holderName(charge.companyId)} demande {formatMoneyFR(charge.amount)}
+          </p>
+          <p className="compte__charge-reason">{charge.reason}</p>
+          <div className="compte__charge-actions">
+            <button className="button button--secondary" onClick={() => refuseCharge(charge.id)}>
+              Refuser
+            </button>
+            <button className="button button--primary" onClick={() => acceptCharge(charge.id)}>
+              Payer sans contact
+            </button>
+          </div>
+        </div>
+      ))}
 
       <div className="compte__actions">
         <button className="button button--primary" onClick={() => navigate('depot')}>

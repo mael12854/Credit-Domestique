@@ -1,4 +1,4 @@
-import type { Account, BankState, Entry, EntryKind, Loan, Role } from './types'
+import type { Account, BankState, Charge, Entry, EntryKind, Loan, Role } from './types'
 
 export const LOAN_RATE = 0.3333
 export const FOUNDER_INTEREST_LABEL = 'Intérêts 33,33 % · rev. fondateur'
@@ -186,6 +186,77 @@ export function companyWithdraw(
     label: reason,
     kind: 'withdrawal',
   }).state
+}
+
+function requireCharge(state: BankState, chargeId: string): Charge {
+  const charge = state.charges.find((c) => c.id === chargeId)
+  if (!charge) throw new BankError('Demande de paiement introuvable.')
+  return charge
+}
+
+function replaceCharge(state: BankState, charge: Charge): BankState {
+  return { ...state, charges: state.charges.map((c) => (c.id === charge.id ? charge : c)) }
+}
+
+/**
+ * A company asks to debit a specific customer — the "contactless" gesture:
+ * nothing moves until that person confirms the tap.
+ */
+export function requestCharge(
+  state: BankState,
+  companyId: string,
+  payerId: string,
+  amount: number,
+  reason: string,
+): { state: BankState; charge: Charge } {
+  if (amount <= 0) throw new BankError('Le montant doit être positif.')
+  if (payerId === companyId) throw new BankError('Une entreprise ne peut pas se débiter elle-même.')
+  requireAccount(state, companyId)
+  requireAccount(state, payerId)
+
+  const charge: Charge = {
+    id: id(),
+    companyId,
+    payerId,
+    amount,
+    reason,
+    status: 'pending',
+    requestedAt: nowIso(),
+  }
+
+  return { state: { ...state, charges: [...state.charges, charge] }, charge }
+}
+
+/** The customer confirms the tap: the amount moves straight from them to the company. */
+export function acceptCharge(
+  state: BankState,
+  chargeId: string,
+): { state: BankState; charge: Charge } {
+  const charge = requireCharge(state, chargeId)
+  if (charge.status !== 'pending') throw new BankError('Cette demande a déjà été traitée.')
+
+  const nextState = postDoubleEntry(state, {
+    fromId: charge.payerId,
+    toId: charge.companyId,
+    amount: charge.amount,
+    label: charge.reason,
+    kind: 'payment',
+  }).state
+
+  const updatedCharge: Charge = { ...charge, status: 'accepted', respondedAt: nowIso() }
+  return { state: replaceCharge(nextState, updatedCharge), charge: updatedCharge }
+}
+
+/** The customer declines the tap: nothing ever moved, so there's nothing to reverse. */
+export function refuseCharge(
+  state: BankState,
+  chargeId: string,
+): { state: BankState; charge: Charge } {
+  const charge = requireCharge(state, chargeId)
+  if (charge.status !== 'pending') throw new BankError('Cette demande a déjà été traitée.')
+
+  const updatedCharge: Charge = { ...charge, status: 'refused', respondedAt: nowIso() }
+  return { state: replaceCharge(state, updatedCharge), charge: updatedCharge }
 }
 
 function requireLoan(state: BankState, loanId: string): Loan {

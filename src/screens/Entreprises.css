@@ -41,7 +41,37 @@
 
 .entreprises__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.entreprises__waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 36px 20px;
+}
+
+.entreprises__waiting-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.entreprises__waiting-title--refused {
+  color: var(--cuivre);
+}
+
+.entreprises__waiting-hint {
+  color: var(--texte-tertiaire);
+  font-size: 13px;
+}
+
+.entreprises__waiting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .entreprises__entry {

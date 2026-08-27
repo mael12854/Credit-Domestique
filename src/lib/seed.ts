@@ -79,6 +79,7 @@ export function createInitialState(): BankState {
     accounts: seedAccounts,
     entries: [],
     loans: [],
+    charges: [],
     currentAccountId: null,
     impersonatedBy: null,
     rate: LOAN_RATE,

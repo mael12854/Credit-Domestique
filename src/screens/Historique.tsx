@@ -12,6 +12,7 @@ const KIND_LABELS: Record<EntryKind, string> = {
   loan: 'Emprunt',
   interest: 'Intérêts',
   adjustment: 'Ajustement',
+  payment: 'Paiement',
 }
 
 const FILTERS: Array<{ value: EntryKind | 'all'; label: string }> = [
@@ -22,6 +23,7 @@ const FILTERS: Array<{ value: EntryKind | 'all'; label: string }> = [
   { value: 'loan', label: 'Emprunts' },
   { value: 'interest', label: 'Intérêts' },
   { value: 'adjustment', label: 'Ajustements' },
+  { value: 'payment', label: 'Paiements' },
 ]
 
 function formatDate(iso: string): string {

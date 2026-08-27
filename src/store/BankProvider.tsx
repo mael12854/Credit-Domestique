@@ -4,7 +4,7 @@ import * as bank from '../lib/bank'
 import { LOAN_RATE } from '../lib/bank'
 import { supabase } from '../lib/supabaseClient'
 import { fetchSharedState, pushDiff } from '../lib/supabaseSync'
-import type { Account, BankState, Role } from '../lib/types'
+import type { Account, BankState, Charge, Role } from '../lib/types'
 
 const SESSION_KEY = 'credit-domestique:session'
 
@@ -31,6 +31,7 @@ const emptyState: BankState = {
   accounts: [],
   entries: [],
   loans: [],
+  charges: [],
   rate: LOAN_RATE,
   currentAccountId: null,
   impersonatedBy: null,
@@ -56,6 +57,9 @@ interface BankContextValue {
   repayLoan: (loanId: string) => void
   companyReceive: (companyId: string, amount: number, reason: string) => void
   companyWithdraw: (companyId: string, amount: number, reason: string) => void
+  requestCharge: (companyId: string, payerId: string, amount: number, reason: string) => Charge
+  acceptCharge: (chargeId: string) => void
+  refuseCharge: (chargeId: string) => void
   adjustBalance: (accountId: string, newBalance: number, label?: string) => void
   reverseEntry: (entryId: string) => void
   setLoanRate: (rate: number) => void
@@ -123,6 +127,7 @@ export function BankProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, scheduleRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' }, scheduleRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'charges' }, scheduleRefetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, scheduleRefetch)
       .subscribe()
 
@@ -219,6 +224,36 @@ export function BankProvider({ children }: { children: ReactNode }) {
     [applyMutation],
   )
 
+  const requestCharge = useCallback(
+    (companyId: string, payerId: string, amount: number, reason: string) => {
+      let created!: Charge
+      setState((prev) => {
+        const { state: next, charge } = bank.requestCharge(prev, companyId, payerId, amount, reason)
+        created = charge
+        if (next !== prev) {
+          pushDiff(prev, next).catch((err) => console.error('Échec de synchronisation Supabase', err))
+        }
+        return next
+      })
+      return created
+    },
+    [],
+  )
+
+  const acceptCharge = useCallback(
+    (chargeId: string) => {
+      applyMutation((prev) => bank.acceptCharge(prev, chargeId).state)
+    },
+    [applyMutation],
+  )
+
+  const refuseCharge = useCallback(
+    (chargeId: string) => {
+      applyMutation((prev) => bank.refuseCharge(prev, chargeId).state)
+    },
+    [applyMutation],
+  )
+
   const adjustBalance = useCallback(
     (accountId: string, newBalance: number, label?: string) => {
       applyMutation((prev) => bank.adjustBalance(prev, accountId, newBalance, label))
@@ -303,6 +338,9 @@ export function BankProvider({ children }: { children: ReactNode }) {
     repayLoan,
     companyReceive,
     companyWithdraw,
+    requestCharge,
+    acceptCharge,
+    refuseCharge,
     adjustBalance,
     reverseEntry,
     setLoanRate,

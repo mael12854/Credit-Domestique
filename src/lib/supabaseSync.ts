@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient'
-import type { Account, BankState, Entry, Loan } from './types'
+import type { Account, BankState, Charge, Entry, Loan } from './types'
 
-type SharedState = Pick<BankState, 'accounts' | 'entries' | 'loans' | 'rate'>
+type SharedState = Pick<BankState, 'accounts' | 'entries' | 'loans' | 'charges' | 'rate'>
 
 function rowToAccount(row: any): Account {
   return {
@@ -97,73 +97,98 @@ function loanToRow(l: Loan) {
   }
 }
 
+function rowToCharge(row: any): Charge {
+  return {
+    id: row.id,
+    companyId: row.company_id,
+    payerId: row.payer_id,
+    amount: row.amount,
+    reason: row.reason,
+    status: row.status,
+    requestedAt: row.requested_at,
+    respondedAt: row.responded_at ?? undefined,
+  }
+}
+
+function chargeToRow(c: Charge) {
+  return {
+    id: c.id,
+    company_id: c.companyId,
+    payer_id: c.payerId,
+    amount: c.amount,
+    reason: c.reason,
+    status: c.status,
+    requested_at: c.requestedAt,
+    responded_at: c.respondedAt ?? null,
+  }
+}
+
 export async function fetchSharedState(): Promise<SharedState> {
-  const [accountsRes, entriesRes, loansRes, settingsRes] = await Promise.all([
+  const [accountsRes, entriesRes, loansRes, chargesRes, settingsRes] = await Promise.all([
     supabase.from('accounts').select('*').order('created_at'),
     supabase.from('entries').select('*').order('date').order('id'),
     supabase.from('loans').select('*').order('requested_at'),
+    supabase.from('charges').select('*').order('requested_at'),
     supabase.from('settings').select('*').eq('id', 1).single(),
   ])
   if (accountsRes.error) throw accountsRes.error
   if (entriesRes.error) throw entriesRes.error
   if (loansRes.error) throw loansRes.error
+  if (chargesRes.error) throw chargesRes.error
   if (settingsRes.error) throw settingsRes.error
 
   return {
     accounts: accountsRes.data.map(rowToAccount),
     entries: entriesRes.data.map(rowToEntry),
     loans: loansRes.data.map(rowToLoan),
+    charges: chargesRes.data.map(rowToCharge),
     rate: Number(settingsRes.data.rate),
   }
 }
 
 /**
- * Persists whatever changed between two BankState snapshots. bank.ts never
- * mutates in place, so referential inequality reliably marks what's new —
- * this diff is what makes the local optimistic update durable and shared
- * across every device.
+ * Inserts rows new since `prev` and, when the table allows it, updates rows
+ * whose reference changed. bank.ts never mutates in place, so referential
+ * inequality reliably marks what's new — no deep diffing needed.
+ */
+async function syncTable<T extends { id: string }>(
+  table: string,
+  prevItems: T[],
+  nextItems: T[],
+  toRow: (item: T) => Record<string, unknown>,
+  { updatable = true }: { updatable?: boolean } = {},
+): Promise<void> {
+  const prevById = new Map(prevItems.map((item) => [item.id, item]))
+  const created: T[] = []
+  const updated: T[] = []
+  for (const item of nextItems) {
+    const prevItem = prevById.get(item.id)
+    if (!prevItem) created.push(item)
+    else if (prevItem !== item) updated.push(item)
+  }
+
+  if (created.length > 0) {
+    const { error } = await supabase.from(table).insert(created.map(toRow))
+    if (error) throw error
+  }
+  if (updatable) {
+    for (const item of updated) {
+      const { error } = await supabase.from(table).update(toRow(item)).eq('id', item.id)
+      if (error) throw error
+    }
+  }
+}
+
+/**
+ * Persists whatever changed between two BankState snapshots — what makes the
+ * local optimistic update durable and shared across every device.
  */
 export async function pushDiff(prev: BankState, next: BankState): Promise<void> {
-  const prevEntryIds = new Set(prev.entries.map((e) => e.id))
-  const newEntries = next.entries.filter((e) => !prevEntryIds.has(e.id))
-  if (newEntries.length > 0) {
-    const { error } = await supabase.from('entries').insert(newEntries.map(entryToRow))
-    if (error) throw error
-  }
-
-  const prevAccountsById = new Map(prev.accounts.map((a) => [a.id, a]))
-  const newAccounts: Account[] = []
-  const changedAccounts: Account[] = []
-  for (const a of next.accounts) {
-    const p = prevAccountsById.get(a.id)
-    if (!p) newAccounts.push(a)
-    else if (p !== a) changedAccounts.push(a)
-  }
-  if (newAccounts.length > 0) {
-    const { error } = await supabase.from('accounts').insert(newAccounts.map(accountToRow))
-    if (error) throw error
-  }
-  for (const a of changedAccounts) {
-    const { error } = await supabase.from('accounts').update(accountToRow(a)).eq('id', a.id)
-    if (error) throw error
-  }
-
-  const prevLoansById = new Map(prev.loans.map((l) => [l.id, l]))
-  const newLoans: Loan[] = []
-  const changedLoans: Loan[] = []
-  for (const l of next.loans) {
-    const p = prevLoansById.get(l.id)
-    if (!p) newLoans.push(l)
-    else if (p !== l) changedLoans.push(l)
-  }
-  if (newLoans.length > 0) {
-    const { error } = await supabase.from('loans').insert(newLoans.map(loanToRow))
-    if (error) throw error
-  }
-  for (const l of changedLoans) {
-    const { error } = await supabase.from('loans').update(loanToRow(l)).eq('id', l.id)
-    if (error) throw error
-  }
+  // entries are append-only: no update policy exists for them, matching "nothing is ever deleted"
+  await syncTable('entries', prev.entries, next.entries, entryToRow, { updatable: false })
+  await syncTable('accounts', prev.accounts, next.accounts, accountToRow)
+  await syncTable('loans', prev.loans, next.loans, loanToRow)
+  await syncTable('charges', prev.charges, next.charges, chargeToRow)
 
   if (prev.rate !== next.rate) {
     const { error } = await supabase.from('settings').update({ rate: next.rate }).eq('id', 1)

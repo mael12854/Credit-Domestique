@@ -1,28 +1,53 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import { ContactlessIcon } from '../components/ContactlessIcon'
 import { accountEntries, formatMoneyFR } from '../lib/bank'
 import { parseAmountToCents } from '../lib/format'
 import { useBank } from '../store/BankProvider'
 import './Entreprises.css'
 import './Forms.css'
 
-type Mode = 'receive' | 'withdraw'
+type Mode = 'receive' | 'withdraw' | 'charge'
 
 export function EntrepriseDetail({ companyId }: { companyId: string }) {
-  const { state, companyReceive, companyWithdraw } = useBank()
+  const { state, companyReceive, companyWithdraw, requestCharge } = useBank()
   const [mode, setMode] = useState<Mode | null>(null)
+  const [payerId, setPayerId] = useState('')
   const [amountInput, setAmountInput] = useState('')
   const [reason, setReason] = useState('')
-  const [step, setStep] = useState<'form' | 'recap'>('form')
+  const [step, setStep] = useState<'form' | 'recap' | 'waiting'>('form')
   const [error, setError] = useState('')
+  const [pendingChargeId, setPendingChargeId] = useState<string | null>(null)
 
   const company = state.accounts.find((a) => a.id === companyId)
   const entries = useMemo(() => accountEntries(state, companyId), [state, companyId])
+  const customers = state.accounts.filter(
+    (a) => !a.archived && (a.role === 'admin' || a.role === 'parent' || a.role === 'child'),
+  )
+  const pendingCharges = state.charges.filter(
+    (c) => c.companyId === companyId && c.status === 'pending',
+  )
+
+  const pendingCharge = pendingChargeId
+    ? state.charges.find((c) => c.id === pendingChargeId)
+    : undefined
+
+  // Once the customer responds (accept or refuse), fall back to the action menu.
+  useEffect(() => {
+    if (pendingCharge && pendingCharge.status !== 'pending') {
+      const timeout = setTimeout(() => {
+        setMode(null)
+        setPendingChargeId(null)
+      }, 1800)
+      return () => clearTimeout(timeout)
+    }
+  }, [pendingCharge])
 
   if (!company) return <p>Entreprise introuvable.</p>
 
   function openMode(next: Mode) {
     setMode(next)
+    setPayerId('')
     setAmountInput('')
     setReason('')
     setError('')
@@ -33,6 +58,10 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
 
   function handleContinue(e: FormEvent) {
     e.preventDefault()
+    if (mode === 'charge' && !payerId) {
+      setError('Choisissez qui débiter.')
+      return
+    }
     if (amount == null || amount <= 0) {
       setError('Montant invalide.')
       return
@@ -49,11 +78,18 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
     if (amount == null || !mode) return
     if (mode === 'receive') {
       companyReceive(companyId, amount, reason.trim())
-    } else {
+      setMode(null)
+    } else if (mode === 'withdraw') {
       companyWithdraw(companyId, amount, reason.trim())
+      setMode(null)
+    } else {
+      const charge = requestCharge(companyId, payerId, amount, reason.trim())
+      setPendingChargeId(charge.id)
+      setStep('waiting')
     }
-    setMode(null)
   }
+
+  const payerName = (id: string) => state.accounts.find((a) => a.id === id)?.holderName ?? '—'
 
   return (
     <div className="entreprises">
@@ -68,21 +104,56 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
       </div>
 
       {mode === null && (
-        <div className="entreprises__actions">
-          <button className="button button--primary" onClick={() => openMode('receive')}>
-            Encaisser
-          </button>
-          <button className="button button--secondary" onClick={() => openMode('withdraw')}>
-            Retirer
-          </button>
-        </div>
+        <>
+          <div className="entreprises__actions">
+            <button className="button button--primary" onClick={() => openMode('charge')}>
+              Paiement sans contact
+            </button>
+            <button className="button button--secondary" onClick={() => openMode('receive')}>
+              Encaisser
+            </button>
+            <button className="button button--secondary" onClick={() => openMode('withdraw')}>
+              Retirer
+            </button>
+          </div>
+
+          {pendingCharges.length > 0 && (
+            <div className="panel compte__loans">
+              <p className="eyebrow">Paiements en attente</p>
+              {pendingCharges.map((c) => (
+                <div key={c.id} className="compte__loan-row">
+                  <span className="entreprises__waiting-row">
+                    <ContactlessIcon size={20} />
+                    {payerName(c.payerId)} · {c.reason}
+                  </span>
+                  <span className="amount">{formatMoneyFR(c.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {mode !== null && step === 'form' && (
         <form className="form-screen" onSubmit={handleContinue} noValidate>
           <h3 className="form-screen__title">
-            {mode === 'receive' ? 'Encaisser un paiement' : 'Retirer de l\'argent'}
+            {mode === 'receive' && 'Encaisser un paiement'}
+            {mode === 'withdraw' && "Retirer de l'argent"}
+            {mode === 'charge' && 'Débiter un client sans contact'}
           </h3>
+          {mode === 'charge' && (
+            <div className="field">
+              <label htmlFor="payer">Débiter</label>
+              <select id="payer" value={payerId} onChange={(e) => setPayerId(e.target.value)}>
+                <option value="">Sélectionner un client</option>
+                {customers.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.holderName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="field">
             <label htmlFor="amount">Montant</label>
             <input
@@ -98,7 +169,7 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
             <label htmlFor="reason">Motif</label>
             <input
               id="reason"
-              placeholder={mode === 'receive' ? 'Vente du jour' : 'Achat de fournitures'}
+              placeholder={mode === 'receive' ? 'Vente du jour' : mode === 'withdraw' ? 'Achat de fournitures' : 'Bonbons'}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
@@ -120,7 +191,11 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
           <div className="panel form-screen__recap">
             <div className="form-screen__recap-row">
               <span>Opération</span>
-              <span>{mode === 'receive' ? 'Encaissement' : 'Retrait'}</span>
+              <span>
+                {mode === 'receive' && 'Encaissement'}
+                {mode === 'withdraw' && 'Retrait'}
+                {mode === 'charge' && `Débiter ${payerName(payerId)}`}
+              </span>
             </div>
             <div className="form-screen__recap-row">
               <span>Motif</span>
@@ -136,9 +211,31 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
               Modifier
             </button>
             <button className="button button--primary" onClick={handleConfirm}>
-              Confirmer
+              {mode === 'charge' ? 'Envoyer la demande' : 'Confirmer'}
             </button>
           </div>
+        </div>
+      )}
+
+      {mode === 'charge' && step === 'waiting' && (
+        <div className="panel entreprises__waiting">
+          {(!pendingCharge || pendingCharge.status === 'pending') && (
+            <>
+              <ContactlessIcon size={56} />
+              <p className="entreprises__waiting-title">Approchez le téléphone de {payerName(payerId)}</p>
+              <p className="entreprises__waiting-hint">
+                En attente de confirmation · {formatMoneyFR(amount ?? 0)}
+              </p>
+            </>
+          )}
+          {pendingCharge?.status === 'accepted' && (
+            <p className="entreprises__waiting-title">Paiement accepté</p>
+          )}
+          {pendingCharge?.status === 'refused' && (
+            <p className="entreprises__waiting-title entreprises__waiting-title--refused">
+              Paiement refusé
+            </p>
+          )}
         </div>
       )}
 

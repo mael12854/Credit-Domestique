@@ -3,6 +3,7 @@ import {
   BANK_ID,
   FOUNDER_ID,
   FOUNDER_INTEREST_LABEL,
+  acceptCharge,
   acceptLoan,
   adjustBalance,
   archiveAccount,
@@ -13,8 +14,10 @@ import {
   formatMoneyFR,
   login,
   postDoubleEntry,
+  refuseCharge,
   refuseLoan,
   repayLoan,
+  requestCharge,
   requestLoan,
   reverseEntry,
   transfer,
@@ -242,6 +245,56 @@ describe('repayLoan', () => {
     const accepted = acceptLoan(requested.state, requested.loan.id).state
     const repaid = repayLoan(accepted, requested.loan.id).state
     expect(() => repayLoan(repaid, requested.loan.id)).toThrow()
+  })
+})
+
+describe('requestCharge', () => {
+  it('creates a pending charge without moving any money', () => {
+    const state = createInitialState()
+    const { state: next, charge } = requestCharge(state, 'epicerie-du-salon', 'marin', 500, 'Bonbons')
+    expect(charge.status).toBe('pending')
+    expect(charge.companyId).toBe('epicerie-du-salon')
+    expect(charge.payerId).toBe('marin')
+    expect(next.entries).toHaveLength(0)
+    expect(balanceOf(next, 'marin')).toBe(0)
+  })
+
+  it('rejects a non-positive amount', () => {
+    expect(() => requestCharge(createInitialState(), 'epicerie-du-salon', 'marin', 0, 'x')).toThrow()
+  })
+
+  it('rejects a company charging itself', () => {
+    expect(() =>
+      requestCharge(createInitialState(), 'epicerie-du-salon', 'epicerie-du-salon', 500, 'x'),
+    ).toThrow()
+  })
+})
+
+describe('acceptCharge', () => {
+  it('moves the amount straight from the customer to the company', () => {
+    const requested = requestCharge(createInitialState(), 'epicerie-du-salon', 'marin', 500, 'Bonbons')
+    const { state: next, charge } = acceptCharge(requested.state, requested.charge.id)
+    expect(charge.status).toBe('accepted')
+    expect(balanceOf(next, 'marin')).toBe(-500)
+    expect(balanceOf(next, 'epicerie-du-salon')).toBe(500)
+    const entry = next.entries.find((e) => e.kind === 'payment' && e.credit != null)
+    expect(entry?.label).toBe('Bonbons')
+  })
+
+  it('refuses to accept a charge twice', () => {
+    const requested = requestCharge(createInitialState(), 'epicerie-du-salon', 'marin', 500, 'Bonbons')
+    const accepted = acceptCharge(requested.state, requested.charge.id)
+    expect(() => acceptCharge(accepted.state, requested.charge.id)).toThrow()
+  })
+})
+
+describe('refuseCharge', () => {
+  it('marks the charge refused without moving any money', () => {
+    const requested = requestCharge(createInitialState(), 'epicerie-du-salon', 'marin', 500, 'Bonbons')
+    const { state: next, charge } = refuseCharge(requested.state, requested.charge.id)
+    expect(charge.status).toBe('refused')
+    expect(next.entries).toHaveLength(0)
+    expect(balanceOf(next, 'marin')).toBe(0)
   })
 })
 
