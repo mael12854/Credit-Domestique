@@ -20,7 +20,7 @@ import {
   transfer,
   withdrawCash,
 } from '../bank'
-import { createInitialState } from '../seed'
+import { createDemoState, createInitialState } from '../seed'
 import type { BankState } from '../types'
 
 function balanceOf(state: BankState, accountId: string): number {
@@ -311,6 +311,19 @@ describe('createAccount / archiveAccount', () => {
     const marin = next.accounts.find((a) => a.id === 'marin')
     expect(marin?.archived).toBe(true)
     expect(next.entries.some((e) => e.accountId === 'marin')).toBe(true)
+  })
+})
+
+describe('createDemoState', () => {
+  it('funds the founder at 250 € and everyone else at 50 €, from the bank', () => {
+    const state = createDemoState()
+    expect(balanceOf(state, FOUNDER_ID)).toBe(25000)
+    expect(balanceOf(state, 'renaud')).toBe(5000)
+    expect(balanceOf(state, 'adeline')).toBe(5000)
+    expect(balanceOf(state, 'marin')).toBe(5000)
+    expect(balanceOf(state, 'joel')).toBe(5000)
+    // double-entry stays balanced: the bank fronts everything it hands out
+    expect(balanceOf(state, BANK_ID)).toBe(-(25000 + 5000 * 4))
   })
 })
 

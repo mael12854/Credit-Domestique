@@ -1,4 +1,4 @@
-import { BANK_ID, FOUNDER_ID, LOAN_RATE } from './bank'
+import { BANK_ID, FOUNDER_ID, LOAN_RATE, adjustBalance } from './bank'
 import type { Account, BankState } from './types'
 
 const seedAccounts: Account[] = [
@@ -83,4 +83,21 @@ export function createInitialState(): BankState {
     impersonatedBy: null,
     rate: LOAN_RATE,
   }
+}
+
+const STARTING_BALANCES: Record<string, number> = {
+  [FOUNDER_ID]: 25000,
+  renaud: 5000,
+  adeline: 5000,
+  marin: 5000,
+  joel: 5000,
+}
+
+/** The state a fresh visit or a demo reset actually starts from: seed accounts, funded via the bank. */
+export function createDemoState(): BankState {
+  let state = createInitialState()
+  for (const [accountId, balance] of Object.entries(STARTING_BALANCES)) {
+    state = adjustBalance(state, accountId, balance, 'Solde initial')
+  }
+  return state
 }

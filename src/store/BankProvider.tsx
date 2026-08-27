@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as bank from '../lib/bank'
-import { createInitialState } from '../lib/seed'
+import { createDemoState } from '../lib/seed'
 import type { Account, BankState, Role } from '../lib/types'
 
 const STORAGE_KEY = 'credit-domestique:v1'
@@ -9,12 +9,12 @@ const STORAGE_KEY = 'credit-domestique:v1'
 function loadState(): BankState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return createInitialState()
+    if (!raw) return createDemoState()
     const parsed = JSON.parse(raw) as BankState
-    if (!parsed.accounts || !parsed.entries) return createInitialState()
+    if (!parsed.accounts || !parsed.entries) return createDemoState()
     return parsed
   } catch {
-    return createInitialState()
+    return createDemoState()
   }
 }
 
@@ -165,7 +165,7 @@ export function BankProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetDemo = useCallback(() => {
-    setState(createInitialState())
+    setState(createDemoState())
   }, [])
 
   const currentAccount = useMemo(
