@@ -7,6 +7,7 @@ import {
   acceptLoan,
   adjustBalance,
   archiveAccount,
+  companyPay,
   computeInterest,
   computeTotalDue,
   createAccount,
@@ -245,6 +246,21 @@ describe('repayLoan', () => {
     const accepted = acceptLoan(requested.state, requested.loan.id).state
     const repaid = repayLoan(accepted, requested.loan.id).state
     expect(() => repayLoan(repaid, requested.loan.id)).toThrow()
+  })
+})
+
+describe('companyPay', () => {
+  it('credits the recipient immediately, no confirmation needed', () => {
+    const state = createInitialState()
+    const next = companyPay(state, 'epicerie-du-salon', 'marin', 500, 'Argent de poche')
+    expect(balanceOf(next, 'marin')).toBe(500)
+    expect(balanceOf(next, 'epicerie-du-salon')).toBe(-500)
+  })
+
+  it('can carry a company arbitrarily negative — an unlimited source of funds', () => {
+    const state = createInitialState()
+    const next = companyPay(state, 'epicerie-du-salon', 'marin', 100000, 'Argent de poche')
+    expect(balanceOf(next, 'epicerie-du-salon')).toBe(-100000)
   })
 })
 

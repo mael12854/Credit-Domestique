@@ -7,12 +7,14 @@ import { useBank } from '../store/BankProvider'
 import './Entreprises.css'
 import './Forms.css'
 
-type Mode = 'receive' | 'withdraw' | 'charge'
+type Mode = 'receive' | 'withdraw' | 'charge' | 'pay'
+
+const NEEDS_PERSON: Mode[] = ['charge', 'pay']
 
 export function EntrepriseDetail({ companyId }: { companyId: string }) {
-  const { state, companyReceive, companyWithdraw, requestCharge } = useBank()
+  const { state, companyReceive, companyWithdraw, companyPay, requestCharge } = useBank()
   const [mode, setMode] = useState<Mode | null>(null)
-  const [payerId, setPayerId] = useState('')
+  const [personId, setPersonId] = useState('')
   const [amountInput, setAmountInput] = useState('')
   const [reason, setReason] = useState('')
   const [step, setStep] = useState<'form' | 'recap' | 'waiting'>('form')
@@ -21,7 +23,7 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
 
   const company = state.accounts.find((a) => a.id === companyId)
   const entries = useMemo(() => accountEntries(state, companyId), [state, companyId])
-  const customers = state.accounts.filter(
+  const people = state.accounts.filter(
     (a) => !a.archived && (a.role === 'admin' || a.role === 'parent' || a.role === 'child'),
   )
   const pendingCharges = state.charges.filter(
@@ -47,7 +49,7 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
 
   function openMode(next: Mode) {
     setMode(next)
-    setPayerId('')
+    setPersonId('')
     setAmountInput('')
     setReason('')
     setError('')
@@ -58,8 +60,8 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
 
   function handleContinue(e: FormEvent) {
     e.preventDefault()
-    if (mode === 'charge' && !payerId) {
-      setError('Choisissez qui débiter.')
+    if (mode && NEEDS_PERSON.includes(mode) && !personId) {
+      setError(mode === 'pay' ? 'Choisissez à qui verser.' : 'Choisissez qui débiter.')
       return
     }
     if (amount == null || amount <= 0) {
@@ -82,14 +84,17 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
     } else if (mode === 'withdraw') {
       companyWithdraw(companyId, amount, reason.trim())
       setMode(null)
+    } else if (mode === 'pay') {
+      companyPay(companyId, personId, amount, reason.trim())
+      setMode(null)
     } else {
-      const charge = requestCharge(companyId, payerId, amount, reason.trim())
+      const charge = requestCharge(companyId, personId, amount, reason.trim())
       setPendingChargeId(charge.id)
       setStep('waiting')
     }
   }
 
-  const payerName = (id: string) => state.accounts.find((a) => a.id === id)?.holderName ?? '—'
+  const personName = (id: string) => state.accounts.find((a) => a.id === id)?.holderName ?? '—'
 
   return (
     <div className="entreprises">
@@ -109,6 +114,9 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
             <button className="button button--primary" onClick={() => openMode('charge')}>
               Paiement sans contact
             </button>
+            <button className="button button--secondary" onClick={() => openMode('pay')}>
+              Verser à quelqu'un
+            </button>
             <button className="button button--secondary" onClick={() => openMode('receive')}>
               Encaisser
             </button>
@@ -124,7 +132,7 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
                 <div key={c.id} className="compte__loan-row">
                   <span className="entreprises__waiting-row">
                     <ContactlessIcon size={20} />
-                    {payerName(c.payerId)} · {c.reason}
+                    {personName(c.payerId)} · {c.reason}
                   </span>
                   <span className="amount">{formatMoneyFR(c.amount)}</span>
                 </div>
@@ -140,13 +148,14 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
             {mode === 'receive' && 'Encaisser un paiement'}
             {mode === 'withdraw' && "Retirer de l'argent"}
             {mode === 'charge' && 'Débiter un client sans contact'}
+            {mode === 'pay' && "Verser de l'argent"}
           </h3>
-          {mode === 'charge' && (
+          {mode && NEEDS_PERSON.includes(mode) && (
             <div className="field">
-              <label htmlFor="payer">Débiter</label>
-              <select id="payer" value={payerId} onChange={(e) => setPayerId(e.target.value)}>
-                <option value="">Sélectionner un client</option>
-                {customers.map((a) => (
+              <label htmlFor="person">{mode === 'pay' ? 'Verser à' : 'Débiter'}</label>
+              <select id="person" value={personId} onChange={(e) => setPersonId(e.target.value)}>
+                <option value="">Sélectionner une personne</option>
+                {people.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.holderName}
                   </option>
@@ -169,7 +178,15 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
             <label htmlFor="reason">Motif</label>
             <input
               id="reason"
-              placeholder={mode === 'receive' ? 'Vente du jour' : mode === 'withdraw' ? 'Achat de fournitures' : 'Bonbons'}
+              placeholder={
+                mode === 'receive'
+                  ? 'Vente du jour'
+                  : mode === 'withdraw'
+                    ? 'Achat de fournitures'
+                    : mode === 'pay'
+                      ? 'Argent de poche'
+                      : 'Bonbons'
+              }
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
@@ -194,7 +211,8 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
               <span>
                 {mode === 'receive' && 'Encaissement'}
                 {mode === 'withdraw' && 'Retrait'}
-                {mode === 'charge' && `Débiter ${payerName(payerId)}`}
+                {mode === 'charge' && `Débiter ${personName(personId)}`}
+                {mode === 'pay' && `Verser à ${personName(personId)}`}
               </span>
             </div>
             <div className="form-screen__recap-row">
@@ -222,7 +240,7 @@ export function EntrepriseDetail({ companyId }: { companyId: string }) {
           {(!pendingCharge || pendingCharge.status === 'pending') && (
             <>
               <ContactlessIcon size={56} />
-              <p className="entreprises__waiting-title">Approchez le téléphone de {payerName(payerId)}</p>
+              <p className="entreprises__waiting-title">Approchez le téléphone de {personName(personId)}</p>
               <p className="entreprises__waiting-hint">
                 En attente de confirmation · {formatMoneyFR(amount ?? 0)}
               </p>

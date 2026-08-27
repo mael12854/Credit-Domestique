@@ -57,6 +57,7 @@ interface BankContextValue {
   repayLoan: (loanId: string) => void
   companyReceive: (companyId: string, amount: number, reason: string) => void
   companyWithdraw: (companyId: string, amount: number, reason: string) => void
+  companyPay: (companyId: string, recipientId: string, amount: number, reason: string) => void
   requestCharge: (companyId: string, payerId: string, amount: number, reason: string) => Charge
   acceptCharge: (chargeId: string) => void
   refuseCharge: (chargeId: string) => void
@@ -224,6 +225,13 @@ export function BankProvider({ children }: { children: ReactNode }) {
     [applyMutation],
   )
 
+  const companyPay = useCallback(
+    (companyId: string, recipientId: string, amount: number, reason: string) => {
+      applyMutation((prev) => bank.companyPay(prev, companyId, recipientId, amount, reason))
+    },
+    [applyMutation],
+  )
+
   const requestCharge = useCallback(
     (companyId: string, payerId: string, amount: number, reason: string) => {
       let created!: Charge
@@ -338,6 +346,7 @@ export function BankProvider({ children }: { children: ReactNode }) {
     repayLoan,
     companyReceive,
     companyWithdraw,
+    companyPay,
     requestCharge,
     acceptCharge,
     refuseCharge,

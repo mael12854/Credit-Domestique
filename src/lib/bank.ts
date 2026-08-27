@@ -188,6 +188,27 @@ export function companyWithdraw(
   }).state
 }
 
+/**
+ * A company pays a specific person directly from its own funds (e.g. an
+ * allowance source) — a straight credit, so unlike a charge it never needs
+ * that person's confirmation.
+ */
+export function companyPay(
+  state: BankState,
+  companyId: string,
+  recipientId: string,
+  amount: number,
+  reason: string,
+): BankState {
+  return postDoubleEntry(state, {
+    fromId: companyId,
+    toId: recipientId,
+    amount,
+    label: reason,
+    kind: 'payment',
+  }).state
+}
+
 function requireCharge(state: BankState, chargeId: string): Charge {
   const charge = state.charges.find((c) => c.id === chargeId)
   if (!charge) throw new BankError('Demande de paiement introuvable.')
