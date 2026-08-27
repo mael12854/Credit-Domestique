@@ -1,25 +1,45 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as bank from '../lib/bank'
-import { createDemoState } from '../lib/seed'
+import { LOAN_RATE } from '../lib/bank'
+import { supabase } from '../lib/supabaseClient'
+import { fetchSharedState, pushDiff } from '../lib/supabaseSync'
 import type { Account, BankState, Role } from '../lib/types'
 
-const STORAGE_KEY = 'credit-domestique:v1'
+const SESSION_KEY = 'credit-domestique:session'
 
-function loadState(): BankState {
+interface Session {
+  currentAccountId: string | null
+  impersonatedBy: string | null
+}
+
+function loadSession(): Session {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return createDemoState()
-    const parsed = JSON.parse(raw) as BankState
-    if (!parsed.accounts || !parsed.entries) return createDemoState()
-    return parsed
+    const raw = localStorage.getItem(SESSION_KEY)
+    if (!raw) return { currentAccountId: null, impersonatedBy: null }
+    const parsed = JSON.parse(raw)
+    return {
+      currentAccountId: parsed.currentAccountId ?? null,
+      impersonatedBy: parsed.impersonatedBy ?? null,
+    }
   } catch {
-    return createDemoState()
+    return { currentAccountId: null, impersonatedBy: null }
   }
+}
+
+const emptyState: BankState = {
+  accounts: [],
+  entries: [],
+  loans: [],
+  rate: LOAN_RATE,
+  currentAccountId: null,
+  impersonatedBy: null,
 }
 
 interface BankContextValue {
   state: BankState
+  /** true until the initial fetch from Supabase completes */
+  loading: boolean
   /** the account currently at the wheel: the logged-in account, or the impersonation target */
   currentAccount: Account | null
   /** the real admin account when impersonating someone else, else null */
@@ -46,21 +66,80 @@ interface BankContextValue {
     cvc: string
     expiry: string
     balance?: number
-  }) => Account
+  }) => void
   archiveAccount: (accountId: string) => void
   impersonate: (accountId: string) => void
   stopImpersonating: () => void
-  resetDemo: () => void
 }
 
 const BankContext = createContext<BankContextValue | null>(null)
 
 export function BankProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<BankState>(loadState)
+  const [state, setState] = useState<BankState>(emptyState)
+  const [loading, setLoading] = useState(true)
+
+  // Every mutation below runs through this: bank.ts never mutates in place,
+  // so `next` is a fresh object we can both apply locally (optimistic) and
+  // diff against `prev` to persist to Supabase — which every other device
+  // then picks up via the realtime subscription.
+  const applyMutation = useCallback((mutate: (prev: BankState) => BankState) => {
+    setState((prev) => {
+      const next = mutate(prev)
+      if (next !== prev) {
+        pushDiff(prev, next).catch((err) => console.error('Échec de synchronisation Supabase', err))
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    let cancelled = false
+
+    fetchSharedState()
+      .then((shared) => {
+        if (cancelled) return
+        const session = loadSession()
+        setState((prev) => ({ ...prev, ...shared, ...session }))
+      })
+      .catch((err) => console.error('Échec du chargement initial Supabase', err))
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    let refetchTimer: ReturnType<typeof setTimeout> | undefined
+    const scheduleRefetch = () => {
+      if (refetchTimer) clearTimeout(refetchTimer)
+      refetchTimer = setTimeout(() => {
+        fetchSharedState()
+          .then((shared) => {
+            if (!cancelled) setState((prev) => ({ ...prev, ...shared }))
+          })
+          .catch((err) => console.error('Échec de resynchronisation Supabase', err))
+      }, 200)
+    }
+
+    const channel = supabase
+      .channel('bank-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'entries' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, scheduleRefetch)
+      .subscribe()
+
+    return () => {
+      cancelled = true
+      if (refetchTimer) clearTimeout(refetchTimer)
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  useEffect(() => {
+    const session: Session = {
+      currentAccountId: state.currentAccountId,
+      impersonatedBy: state.impersonatedBy,
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  }, [state.currentAccountId, state.impersonatedBy])
 
   const login = useCallback((cardNumber: string, holderName: string, cvc: string) => {
     let result: Account | null = null
@@ -77,53 +156,89 @@ export function BankProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, currentAccountId: null, impersonatedBy: null }))
   }, [])
 
-  const depositCash = useCallback((holderId: string, amount: number) => {
-    setState((prev) => bank.depositCash(prev, holderId, amount))
-  }, [])
+  const depositCash = useCallback(
+    (holderId: string, amount: number) => {
+      applyMutation((prev) => bank.depositCash(prev, holderId, amount))
+    },
+    [applyMutation],
+  )
 
-  const withdrawCash = useCallback((holderId: string, amount: number) => {
-    setState((prev) => bank.withdrawCash(prev, holderId, amount))
-  }, [])
+  const withdrawCash = useCallback(
+    (holderId: string, amount: number) => {
+      applyMutation((prev) => bank.withdrawCash(prev, holderId, amount))
+    },
+    [applyMutation],
+  )
 
-  const transfer = useCallback((fromId: string, toId: string, amount: number, label: string) => {
-    setState((prev) => bank.transfer(prev, fromId, toId, amount, label))
-  }, [])
+  const transfer = useCallback(
+    (fromId: string, toId: string, amount: number, label: string) => {
+      applyMutation((prev) => bank.transfer(prev, fromId, toId, amount, label))
+    },
+    [applyMutation],
+  )
 
-  const requestLoan = useCallback((borrowerId: string, lenderId: string, principal: number) => {
-    setState((prev) => bank.requestLoan(prev, borrowerId, lenderId, principal).state)
-  }, [])
+  const requestLoan = useCallback(
+    (borrowerId: string, lenderId: string, principal: number) => {
+      applyMutation((prev) => bank.requestLoan(prev, borrowerId, lenderId, principal).state)
+    },
+    [applyMutation],
+  )
 
-  const acceptLoan = useCallback((loanId: string) => {
-    setState((prev) => bank.acceptLoan(prev, loanId).state)
-  }, [])
+  const acceptLoan = useCallback(
+    (loanId: string) => {
+      applyMutation((prev) => bank.acceptLoan(prev, loanId).state)
+    },
+    [applyMutation],
+  )
 
-  const refuseLoan = useCallback((loanId: string) => {
-    setState((prev) => bank.refuseLoan(prev, loanId).state)
-  }, [])
+  const refuseLoan = useCallback(
+    (loanId: string) => {
+      applyMutation((prev) => bank.refuseLoan(prev, loanId).state)
+    },
+    [applyMutation],
+  )
 
-  const repayLoan = useCallback((loanId: string) => {
-    setState((prev) => bank.repayLoan(prev, loanId).state)
-  }, [])
+  const repayLoan = useCallback(
+    (loanId: string) => {
+      applyMutation((prev) => bank.repayLoan(prev, loanId).state)
+    },
+    [applyMutation],
+  )
 
-  const companyReceive = useCallback((companyId: string, amount: number, reason: string) => {
-    setState((prev) => bank.companyReceive(prev, companyId, amount, reason))
-  }, [])
+  const companyReceive = useCallback(
+    (companyId: string, amount: number, reason: string) => {
+      applyMutation((prev) => bank.companyReceive(prev, companyId, amount, reason))
+    },
+    [applyMutation],
+  )
 
-  const companyWithdraw = useCallback((companyId: string, amount: number, reason: string) => {
-    setState((prev) => bank.companyWithdraw(prev, companyId, amount, reason))
-  }, [])
+  const companyWithdraw = useCallback(
+    (companyId: string, amount: number, reason: string) => {
+      applyMutation((prev) => bank.companyWithdraw(prev, companyId, amount, reason))
+    },
+    [applyMutation],
+  )
 
-  const adjustBalance = useCallback((accountId: string, newBalance: number, label?: string) => {
-    setState((prev) => bank.adjustBalance(prev, accountId, newBalance, label))
-  }, [])
+  const adjustBalance = useCallback(
+    (accountId: string, newBalance: number, label?: string) => {
+      applyMutation((prev) => bank.adjustBalance(prev, accountId, newBalance, label))
+    },
+    [applyMutation],
+  )
 
-  const reverseEntry = useCallback((entryId: string) => {
-    setState((prev) => bank.reverseEntry(prev, entryId))
-  }, [])
+  const reverseEntry = useCallback(
+    (entryId: string) => {
+      applyMutation((prev) => bank.reverseEntry(prev, entryId))
+    },
+    [applyMutation],
+  )
 
-  const setLoanRate = useCallback((rate: number) => {
-    setState((prev) => bank.setLoanRate(prev, rate))
-  }, [])
+  const setLoanRate = useCallback(
+    (rate: number) => {
+      applyMutation((prev) => bank.setLoanRate(prev, rate))
+    },
+    [applyMutation],
+  )
 
   const createAccount = useCallback(
     (input: {
@@ -134,20 +249,17 @@ export function BankProvider({ children }: { children: ReactNode }) {
       expiry: string
       balance?: number
     }) => {
-      let created!: Account
-      setState((prev) => {
-        const { state: next, account } = bank.createAccount(prev, input)
-        created = account
-        return next
-      })
-      return created
+      applyMutation((prev) => bank.createAccount(prev, input).state)
     },
-    [],
+    [applyMutation],
   )
 
-  const archiveAccount = useCallback((accountId: string) => {
-    setState((prev) => bank.archiveAccount(prev, accountId))
-  }, [])
+  const archiveAccount = useCallback(
+    (accountId: string) => {
+      applyMutation((prev) => bank.archiveAccount(prev, accountId))
+    },
+    [applyMutation],
+  )
 
   const impersonate = useCallback((accountId: string) => {
     setState((prev) => {
@@ -164,10 +276,6 @@ export function BankProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const resetDemo = useCallback(() => {
-    setState(createDemoState())
-  }, [])
-
   const currentAccount = useMemo(
     () => state.accounts.find((a) => a.id === state.currentAccountId) ?? null,
     [state.accounts, state.currentAccountId],
@@ -180,6 +288,7 @@ export function BankProvider({ children }: { children: ReactNode }) {
 
   const value: BankContextValue = {
     state,
+    loading,
     currentAccount,
     adminAccount,
     isAdmin,
@@ -201,7 +310,6 @@ export function BankProvider({ children }: { children: ReactNode }) {
     archiveAccount,
     impersonate,
     stopImpersonating,
-    resetDemo,
   }
 
   return <BankContext.Provider value={value}>{children}</BankContext.Provider>

@@ -16,8 +16,7 @@ const ROLE_LABELS: Record<Role, string> = {
 }
 
 export function Admin() {
-  const { state, adjustBalance, archiveAccount, impersonate, createAccount, setLoanRate, resetDemo } =
-    useBank()
+  const { state, adjustBalance, archiveAccount, impersonate, createAccount, setLoanRate } = useBank()
   const { navigate } = useNav()
   const [rateInput, setRateInput] = useState(String(state.rate * 100).replace('.', ','))
 
@@ -208,18 +207,6 @@ export function Admin() {
             Créer le compte
           </button>
         </form>
-      </section>
-
-      <section className="admin__section admin__danger">
-        <p className="eyebrow">Zone technique</p>
-        <button
-          className="button button--danger"
-          onClick={() => {
-            if (confirm('Réinitialiser toutes les données de démonstration ?')) resetDemo()
-          }}
-        >
-          Réinitialiser les données de démonstration
-        </button>
       </section>
     </div>
   )

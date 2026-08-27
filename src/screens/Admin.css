@@ -90,7 +90,3 @@
   gap: 14px;
 }
 
-.admin__danger {
-  padding-top: 12px;
-  border-top: 1px solid var(--bordure-alerte);
-}

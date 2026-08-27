@@ -13,8 +13,16 @@ import { BankProvider, useBank } from './store/BankProvider'
 import { NavProvider, useNav } from './store/NavProvider'
 
 function Screens() {
-  const { currentAccount } = useBank()
+  const { currentAccount, loading } = useBank()
   const { current } = useNav()
+
+  if (loading) {
+    return (
+      <div className="app-loading mono" aria-label="Chargement">
+        …
+      </div>
+    )
+  }
 
   if (!currentAccount) return <Connexion />
 

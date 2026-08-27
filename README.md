@@ -1,6 +1,7 @@
 # Crédit Domestique
 
-Banque fictive familiale — React + Vite, sans backend, persistée en `localStorage`.
+Banque fictive familiale — React + Vite, données partagées en direct entre
+tous les appareils de la famille via Supabase.
 
 > Établissement fictif · aucune valeur légale
 
@@ -26,9 +27,25 @@ npm run dev
   calcul des intérêts (33,33 % arrondi au centime supérieur), dépôts/retraits
   d'espèces, virements, prêts, ajustements et annulations administrateur.
 - `src/lib/types.ts` — modèle de données (`Account`, `Entry`, `Loan`).
-- `src/lib/seed.ts` — comptes de démonstration (voir plus bas).
-- `src/store/BankProvider.tsx` — état applicatif persisté en `localStorage`.
+- `src/lib/seed.ts` — comptes de démonstration (voir plus bas) ; sert de
+  fixture aux tests, le vrai amorçage vit dans la migration Supabase.
+- `src/lib/supabaseClient.ts` / `src/lib/supabaseSync.ts` — client Supabase et
+  synchronisation : chargement initial, diff optimiste vers les tables, et
+  rafraîchissement en direct via Supabase Realtime quand un autre appareil
+  modifie les données.
+- `src/store/BankProvider.tsx` — état applicatif. Les données partagées
+  (comptes, écritures, prêts, taux) vivent dans Supabase ; la session (qui est
+  connecté, sous quelle identité) reste locale à l'appareil (`localStorage`).
 - `src/store/NavProvider.tsx` — navigation en pile (un écran à la fois, retour disponible).
+
+## Supabase
+
+Projet : `Credit-Domestique` (org `Crédit Domestique`). Aucune authentification
+par utilisateur — la clé publique (`sb_publishable_...`, embarquée dans le
+bundle par conception) suffit à lire/écrire, comme choisi pour cette appli
+familiale sans valeur réelle. Les écritures (`entries`) n'ont pas de policy
+`update`/`delete` : la comptabilité en double écriture reste immuable au
+niveau de la base, pas seulement par convention côté client.
 - `src/screens/` — Connexion, Compte, Historique, Virement, Dépôt/Retrait
   d'espèces, Emprunt, Entreprises, Admin.
 
