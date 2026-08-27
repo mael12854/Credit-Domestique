@@ -30,8 +30,10 @@ interface BankContextValue {
   depositCash: (holderId: string, amount: number) => void
   withdrawCash: (holderId: string, amount: number) => void
   transfer: (fromId: string, toId: string, amount: number, label: string) => void
-  openLoan: (borrowerId: string, principal: number) => void
-  repayLoan: (loanId: string, amount: number) => void
+  requestLoan: (borrowerId: string, lenderId: string, principal: number) => void
+  acceptLoan: (loanId: string) => void
+  refuseLoan: (loanId: string) => void
+  repayLoan: (loanId: string) => void
   companyReceive: (companyId: string, amount: number, reason: string) => void
   companyWithdraw: (companyId: string, amount: number, reason: string) => void
   adjustBalance: (accountId: string, newBalance: number, label?: string) => void
@@ -87,12 +89,20 @@ export function BankProvider({ children }: { children: ReactNode }) {
     setState((prev) => bank.transfer(prev, fromId, toId, amount, label))
   }, [])
 
-  const openLoan = useCallback((borrowerId: string, principal: number) => {
-    setState((prev) => bank.openLoan(prev, borrowerId, principal).state)
+  const requestLoan = useCallback((borrowerId: string, lenderId: string, principal: number) => {
+    setState((prev) => bank.requestLoan(prev, borrowerId, lenderId, principal).state)
   }, [])
 
-  const repayLoan = useCallback((loanId: string, amount: number) => {
-    setState((prev) => bank.repayLoan(prev, loanId, amount).state)
+  const acceptLoan = useCallback((loanId: string) => {
+    setState((prev) => bank.acceptLoan(prev, loanId).state)
+  }, [])
+
+  const refuseLoan = useCallback((loanId: string) => {
+    setState((prev) => bank.refuseLoan(prev, loanId).state)
+  }, [])
+
+  const repayLoan = useCallback((loanId: string) => {
+    setState((prev) => bank.repayLoan(prev, loanId).state)
   }, [])
 
   const companyReceive = useCallback((companyId: string, amount: number, reason: string) => {
@@ -178,7 +188,9 @@ export function BankProvider({ children }: { children: ReactNode }) {
     depositCash,
     withdrawCash,
     transfer,
-    openLoan,
+    requestLoan,
+    acceptLoan,
+    refuseLoan,
     repayLoan,
     companyReceive,
     companyWithdraw,

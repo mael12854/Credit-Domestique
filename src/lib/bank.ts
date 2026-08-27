@@ -188,77 +188,113 @@ export function companyWithdraw(
   }).state
 }
 
+function requireLoan(state: BankState, loanId: string): Loan {
+  const loan = state.loans.find((l) => l.id === loanId)
+  if (!loan) throw new BankError('Prêt introuvable.')
+  return loan
+}
+
+function replaceLoan(state: BankState, loan: Loan): BankState {
+  return { ...state, loans: state.loans.map((l) => (l.id === loan.id ? loan : l)) }
+}
+
 /**
- * Signs a loan: credits the borrower with the principal and Maël (founder)
- * with the interest, both drawn from the bank account. The interest never
- * touches the bank's or a parent's balance.
+ * Requests a loan from a chosen lender. Nothing moves yet — the lender must
+ * accept. Only a loan from the founder carries interest; any other lender is
+ * an interest-free peer loan.
  */
-export function openLoan(
+export function requestLoan(
   state: BankState,
   borrowerId: string,
+  lenderId: string,
   principal: number,
 ): { state: BankState; loan: Loan } {
   if (principal <= 0) throw new BankError('Le capital emprunté doit être positif.')
-  const rate = state.rate ?? LOAN_RATE
-  const interest = computeInterest(principal, rate)
+  if (lenderId === borrowerId) throw new BankError('Impossible de vous emprunter à vous-même.')
+  requireAccount(state, borrowerId)
+  requireAccount(state, lenderId)
+
+  const isFounderLoan = lenderId === FOUNDER_ID
+  const rate = isFounderLoan ? state.rate ?? LOAN_RATE : 0
+  const interest = isFounderLoan ? computeInterest(principal, rate) : 0
   const totalDue = principal + interest
-  const date = nowIso()
-
-  const afterPrincipal = postDoubleEntry(state, {
-    fromId: BANK_ID,
-    toId: borrowerId,
-    amount: principal,
-    label: 'Emprunt · capital',
-    kind: 'loan',
-    date,
-  }).state
-
-  const afterInterest = postDoubleEntry(afterPrincipal, {
-    fromId: BANK_ID,
-    toId: FOUNDER_ID,
-    amount: interest,
-    label: FOUNDER_INTEREST_LABEL,
-    kind: 'interest',
-    date,
-  }).state
 
   const loan: Loan = {
     id: id(),
     borrowerId,
+    lenderId,
     principal,
     rate,
     interest,
     totalDue,
     repaid: 0,
-    openedAt: date,
+    status: 'pending',
+    requestedAt: nowIso(),
   }
 
-  return { state: { ...afterInterest, loans: [...afterInterest.loans, loan] }, loan }
+  return { state: { ...state, loans: [...state.loans, loan] }, loan }
 }
 
-export function repayLoan(
-  state: BankState,
-  loanId: string,
-  amount: number,
-): { state: BankState; loan: Loan } {
-  const loan = state.loans.find((l) => l.id === loanId)
-  if (!loan) throw new BankError('Prêt introuvable.')
-  const remaining = loan.totalDue - loan.repaid
-  if (amount <= 0 || amount > remaining) {
-    throw new BankError('Montant de remboursement invalide.')
-  }
+/** The lender accepts a pending request: the principal moves from their own account to the borrower's. */
+export function acceptLoan(state: BankState, loanId: string): { state: BankState; loan: Loan } {
+  const loan = requireLoan(state, loanId)
+  if (loan.status !== 'pending') throw new BankError('Cette demande a déjà été traitée.')
+
   const nextState = postDoubleEntry(state, {
+    fromId: loan.lenderId,
+    toId: loan.borrowerId,
+    amount: loan.principal,
+    label: 'Emprunt · capital',
+    kind: 'loan',
+  }).state
+
+  const updatedLoan: Loan = { ...loan, status: 'accepted', respondedAt: nowIso() }
+  return { state: replaceLoan(nextState, updatedLoan), loan: updatedLoan }
+}
+
+/** The lender refuses a pending request: nothing was ever moved, so there's nothing to reverse. */
+export function refuseLoan(state: BankState, loanId: string): { state: BankState; loan: Loan } {
+  const loan = requireLoan(state, loanId)
+  if (loan.status !== 'pending') throw new BankError('Cette demande a déjà été traitée.')
+
+  const updatedLoan: Loan = { ...loan, status: 'refused', respondedAt: nowIso() }
+  return { state: replaceLoan(state, updatedLoan), loan: updatedLoan }
+}
+
+/**
+ * Repays an accepted loan in full: the principal goes back to the lender.
+ * When the lender is the founder, the interest is paid alongside it as its
+ * own labeled entry — so it always lands on him, in full, whoever the
+ * borrower is.
+ */
+export function repayLoan(state: BankState, loanId: string): { state: BankState; loan: Loan } {
+  const loan = requireLoan(state, loanId)
+  if (loan.status !== 'accepted') throw new BankError('Ce prêt ne peut pas être remboursé.')
+
+  const date = nowIso()
+  const afterPrincipal = postDoubleEntry(state, {
     fromId: loan.borrowerId,
-    toId: BANK_ID,
-    amount,
+    toId: loan.lenderId,
+    amount: loan.principal,
     label: 'Remboursement · échéance',
     kind: 'transfer',
+    date,
   }).state
-  const updatedLoan: Loan = { ...loan, repaid: loan.repaid + amount }
-  return {
-    state: { ...nextState, loans: nextState.loans.map((l) => (l.id === loanId ? updatedLoan : l)) },
-    loan: updatedLoan,
-  }
+
+  const afterInterest =
+    loan.interest > 0
+      ? postDoubleEntry(afterPrincipal, {
+          fromId: loan.borrowerId,
+          toId: loan.lenderId,
+          amount: loan.interest,
+          label: FOUNDER_INTEREST_LABEL,
+          kind: 'interest',
+          date,
+        }).state
+      : afterPrincipal
+
+  const updatedLoan: Loan = { ...loan, status: 'repaid', repaid: loan.totalDue }
+  return { state: replaceLoan(afterInterest, updatedLoan), loan: updatedLoan }
 }
 
 /** Admin: sets an account's balance to an arbitrary value via an adjustment entry. */

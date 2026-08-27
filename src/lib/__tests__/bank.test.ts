@@ -3,6 +3,7 @@ import {
   BANK_ID,
   FOUNDER_ID,
   FOUNDER_INTEREST_LABEL,
+  acceptLoan,
   adjustBalance,
   archiveAccount,
   computeInterest,
@@ -11,9 +12,10 @@ import {
   depositCash,
   formatMoneyFR,
   login,
-  openLoan,
   postDoubleEntry,
+  refuseLoan,
   repayLoan,
+  requestLoan,
   reverseEntry,
   transfer,
   withdrawCash,
@@ -136,45 +138,110 @@ describe('transfer', () => {
   })
 })
 
-describe('openLoan', () => {
-  it('credits the borrower with the principal and the founder with the interest', () => {
+describe('requestLoan', () => {
+  it('creates a pending request without moving any money', () => {
     const state = createInitialState()
-    const { state: next, loan } = openLoan(state, 'marin', 3000)
-    expect(balanceOf(next, 'marin')).toBe(3000)
-    expect(balanceOf(next, FOUNDER_ID)).toBe(1000)
-    expect(loan.principal).toBe(3000)
-    expect(loan.interest).toBe(1000)
-    expect(loan.totalDue).toBe(4000)
-    expect(loan.repaid).toBe(0)
+    const { state: next, loan } = requestLoan(state, 'marin', 'renaud', 3000)
+    expect(loan.status).toBe('pending')
+    expect(loan.borrowerId).toBe('marin')
+    expect(loan.lenderId).toBe('renaud')
+    expect(next.entries).toHaveLength(0)
+    expect(balanceOf(next, 'marin')).toBe(0)
+    expect(balanceOf(next, 'renaud')).toBe(0)
   })
 
-  it('never credits interest to the bank or a parent', () => {
-    const state = createInitialState()
-    const { state: next } = openLoan(state, 'marin', 3000)
-    expect(balanceOf(next, BANK_ID)).toBe(-4000)
-    expect(balanceOf(next, 'renaud')).toBe(0)
-    expect(balanceOf(next, 'adeline')).toBe(0)
+  it('is interest-free when the lender is not the founder', () => {
+    const { loan } = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    expect(loan.interest).toBe(0)
+    expect(loan.totalDue).toBe(3000)
+  })
+
+  it('carries 33.33% interest, rounded up, when the lender is the founder', () => {
+    const { loan } = requestLoan(createInitialState(), 'marin', FOUNDER_ID, 3000)
+    expect(loan.interest).toBe(1000)
+    expect(loan.totalDue).toBe(4000)
+  })
+
+  it('rejects a non-positive principal', () => {
+    expect(() => requestLoan(createInitialState(), 'marin', 'renaud', 0)).toThrow()
+  })
+
+  it('rejects borrowing from yourself', () => {
+    expect(() => requestLoan(createInitialState(), 'marin', 'marin', 1000)).toThrow()
+  })
+})
+
+describe('acceptLoan', () => {
+  it('moves the principal from the lender to the borrower', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const { state: next, loan } = acceptLoan(requested.state, requested.loan.id)
+    expect(loan.status).toBe('accepted')
+    expect(balanceOf(next, 'marin')).toBe(3000)
+    expect(balanceOf(next, 'renaud')).toBe(-3000)
+  })
+
+  it('never touches the bank when peers lend to each other', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const { state: next } = acceptLoan(requested.state, requested.loan.id)
+    expect(balanceOf(next, BANK_ID)).toBe(0)
+  })
+
+  it('refuses to accept a request twice', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const accepted = acceptLoan(requested.state, requested.loan.id)
+    expect(() => acceptLoan(accepted.state, requested.loan.id)).toThrow()
+  })
+})
+
+describe('refuseLoan', () => {
+  it('marks the request refused without moving any money', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const { state: next, loan } = refuseLoan(requested.state, requested.loan.id)
+    expect(loan.status).toBe('refused')
+    expect(next.entries).toHaveLength(0)
+    expect(balanceOf(next, 'marin')).toBe(0)
+  })
+})
+
+describe('repayLoan', () => {
+  it('pays the principal back to the lender when interest-free', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const accepted = acceptLoan(requested.state, requested.loan.id).state
+    const { state: next, loan } = repayLoan(accepted, requested.loan.id)
+    expect(loan.status).toBe('repaid')
+    expect(balanceOf(next, 'marin')).toBe(3000 - 3000)
+    expect(balanceOf(next, 'renaud')).toBe(-3000 + 3000)
+  })
+
+  it('pays principal + interest to the founder, in full, when he is the lender', () => {
+    const requested = requestLoan(createInitialState(), 'marin', FOUNDER_ID, 3000)
+    const accepted = acceptLoan(requested.state, requested.loan.id).state
+    const { state: next, loan } = repayLoan(accepted, requested.loan.id)
+    expect(loan.repaid).toBe(4000)
+    expect(balanceOf(next, 'marin')).toBe(3000 - 4000)
+    expect(balanceOf(next, FOUNDER_ID)).toBe(-3000 + 4000)
     const interestEntry = next.entries.find((e) => e.kind === 'interest' && e.credit != null)
     expect(interestEntry?.label).toBe(FOUNDER_INTEREST_LABEL)
     expect(interestEntry?.accountId).toBe(FOUNDER_ID)
   })
 
-  it('rejects a non-positive principal', () => {
-    expect(() => openLoan(createInitialState(), 'marin', 0)).toThrow()
-  })
-})
-
-describe('repayLoan', () => {
-  it('debits the borrower and credits the bank, tracking repaid', () => {
-    const opened = openLoan(createInitialState(), 'marin', 3000)
-    const { state: next, loan } = repayLoan(opened.state, opened.loan.id, 4000)
-    expect(loan.repaid).toBe(4000)
-    expect(balanceOf(next, 'marin')).toBe(3000 - 4000)
+  it('never credits interest to a non-founder lender', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const accepted = acceptLoan(requested.state, requested.loan.id).state
+    const { state: next } = repayLoan(accepted, requested.loan.id)
+    expect(next.entries.some((e) => e.kind === 'interest')).toBe(false)
   })
 
-  it('rejects repaying more than what remains due', () => {
-    const opened = openLoan(createInitialState(), 'marin', 3000)
-    expect(() => repayLoan(opened.state, opened.loan.id, 4001)).toThrow()
+  it('refuses to repay a loan that was never accepted', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    expect(() => repayLoan(requested.state, requested.loan.id)).toThrow()
+  })
+
+  it('refuses to repay the same loan twice', () => {
+    const requested = requestLoan(createInitialState(), 'marin', 'renaud', 3000)
+    const accepted = acceptLoan(requested.state, requested.loan.id).state
+    const repaid = repayLoan(accepted, requested.loan.id).state
+    expect(() => repayLoan(repaid, requested.loan.id)).toThrow()
   })
 })
 

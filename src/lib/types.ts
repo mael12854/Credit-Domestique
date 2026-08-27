@@ -37,15 +37,21 @@ export interface Entry {
   reversalOf?: string
 }
 
+export type LoanStatus = 'pending' | 'accepted' | 'refused' | 'repaid'
+
 export interface Loan {
   id: string
   borrowerId: string
+  /** the account asked to fund the loan — only interest-bearing when this is the founder */
+  lenderId: string
   principal: number // cents
-  rate: number // 0.3333
-  interest: number // cents, ceil(principal * rate)
+  rate: number // 0.3333, or 0 when the lender isn't the founder
+  interest: number // cents, ceil(principal * rate) — 0 unless lenderId is the founder
   totalDue: number // cents
   repaid: number // cents
-  openedAt: string // ISO
+  status: LoanStatus
+  requestedAt: string // ISO
+  respondedAt?: string // ISO — set when accepted or refused
 }
 
 export interface BankState {

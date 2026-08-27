@@ -48,9 +48,24 @@
 .compte__loan-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   font-size: 14px;
   flex-wrap: wrap;
+}
+
+.compte__loan-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.compte__loan-pending {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ardoise);
 }
 
 .compte__history-link {

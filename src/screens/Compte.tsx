@@ -5,16 +5,35 @@ import { useNav } from '../store/NavProvider'
 import './Compte.css'
 
 export function Compte() {
-  const { currentAccount, state } = useBank()
+  const { currentAccount, state, acceptLoan, refuseLoan, repayLoan } = useBank()
   const { navigate } = useNav()
 
   if (!currentAccount) return null
 
   const isOverdrawn = currentAccount.balance < 0
   const isCompanyOrBank = currentAccount.role === 'company' || currentAccount.role === 'bank'
-  const loans = state.loans.filter(
-    (l) => l.borrowerId === currentAccount.id && l.repaid < l.totalDue,
+
+  const holderName = (accountId: string) =>
+    state.accounts.find((a) => a.id === accountId)?.holderName ?? '—'
+
+  const requestsReceived = state.loans.filter(
+    (l) => l.lenderId === currentAccount.id && l.status === 'pending',
   )
+  const requestsSent = state.loans.filter(
+    (l) => l.borrowerId === currentAccount.id && l.status === 'pending',
+  )
+  const myOutstandingLoans = state.loans.filter(
+    (l) => l.borrowerId === currentAccount.id && l.status === 'accepted',
+  )
+  const loansGranted = state.loans.filter(
+    (l) => l.lenderId === currentAccount.id && l.status === 'accepted',
+  )
+
+  function handleRepay(loanId: string, totalDue: number, lenderId: string) {
+    if (confirm(`Rembourser ${formatMoneyFR(totalDue)} à ${holderName(lenderId)} ?`)) {
+      repayLoan(loanId)
+    }
+  }
 
   return (
     <div className="compte">
@@ -50,17 +69,72 @@ export function Compte() {
         )}
       </div>
 
-      {loans.length > 0 && (
+      {requestsReceived.length > 0 && (
         <div className="panel compte__loans">
-          <p className="eyebrow">Encours de prêt</p>
-          {loans.map((loan) => (
+          <p className="eyebrow">Demandes de prêt reçues</p>
+          {requestsReceived.map((loan) => (
             <div key={loan.id} className="compte__loan-row">
               <span>
-                Capital {formatMoneyFR(loan.principal)} · échéance {formatMoneyFR(loan.totalDue)}
+                {holderName(loan.borrowerId)} · {formatMoneyFR(loan.principal)}
+                {loan.interest > 0 && ` (+ ${formatMoneyFR(loan.interest)} d'intérêts)`}
               </span>
-              <span className="amount amount--debit">
-                Reste dû {formatMoneyFR(loan.totalDue - loan.repaid)}
+              <span className="compte__loan-actions">
+                <button className="button button--ghost" onClick={() => acceptLoan(loan.id)}>
+                  Accepter
+                </button>
+                <button className="button button--ghost" onClick={() => refuseLoan(loan.id)}>
+                  Refuser
+                </button>
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {requestsSent.length > 0 && (
+        <div className="panel compte__loans">
+          <p className="eyebrow">Mes demandes en attente</p>
+          {requestsSent.map((loan) => (
+            <div key={loan.id} className="compte__loan-row">
+              <span>
+                À {holderName(loan.lenderId)} · {formatMoneyFR(loan.principal)}
+              </span>
+              <span className="compte__loan-pending">En attente</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {myOutstandingLoans.length > 0 && (
+        <div className="panel compte__loans">
+          <p className="eyebrow">Encours de prêt</p>
+          {myOutstandingLoans.map((loan) => (
+            <div key={loan.id} className="compte__loan-row">
+              <span>
+                {holderName(loan.lenderId)} · capital {formatMoneyFR(loan.principal)}
+                {loan.interest > 0 && ` · intérêts ${formatMoneyFR(loan.interest)}`}
+              </span>
+              <span className="compte__loan-actions">
+                <span className="amount amount--debit">Dû {formatMoneyFR(loan.totalDue)}</span>
+                <button
+                  className="button button--ghost"
+                  onClick={() => handleRepay(loan.id, loan.totalDue, loan.lenderId)}
+                >
+                  Rembourser
+                </button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loansGranted.length > 0 && (
+        <div className="panel compte__loans">
+          <p className="eyebrow">Prêts que vous avez accordés</p>
+          {loansGranted.map((loan) => (
+            <div key={loan.id} className="compte__loan-row">
+              <span>{holderName(loan.borrowerId)}</span>
+              <span className="amount amount--credit">On vous doit {formatMoneyFR(loan.totalDue)}</span>
             </div>
           ))}
         </div>
