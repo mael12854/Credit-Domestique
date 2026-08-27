@@ -11,17 +11,21 @@ Banque fictive familiale, en ligne, partagée en direct par toute la famille.
 C'est un site web normal : on l'ouvre dans un navigateur, sur téléphone ou
 ordinateur, rien à installer.
 
-## Comptes de démonstration
+## Comptes
 
 | Titulaire | Rôle | Numéro | CVC | Exp. |
 | --- | --- | --- | --- | --- |
 | MAËL FONDATEUR | admin | 4972 0031 8846 5120 | 417 | 08/30 |
 | RENAUD · PARENT | parent | 4972 0031 8846 5138 | 204 | 11/29 |
 | ADELINE · PARENT | parent | 4972 0031 8846 5146 | 851 | 11/29 |
+| PAPET · GRAND-PÈRE | parent | 4972 0031 8846 5179 | 356 | 09/28 |
+| NANOU · GRAND-MÈRE | parent | 4972 0031 8846 5187 | 902 | 03/32 |
 | MARIN · FOYER | enfant | 4972 0031 8846 5153 | 639 | 06/31 |
 | JOËL · FOYER | enfant | 4972 0031 8846 5161 | 728 | 06/31 |
 
-Numéros et CVC fictifs, sans rapport avec un vrai réseau de carte.
+Numéros et CVC fictifs, sans rapport avec un vrai réseau de carte. Les
+comptes vivent dans Supabase (voir plus bas) — cette table n'est qu'une
+référence, elle ne pilote pas ce qui existe réellement sur le site.
 
 ---
 
